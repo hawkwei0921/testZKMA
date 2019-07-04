@@ -3,13 +3,18 @@ package com.hawk.testzkma;
 import android.app.Activity;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.htc.htcwalletsdk.Export.HtcWalletSdkManager;
 import com.htc.htcwalletsdk.Export.RESULT;
+import com.htc.htcwalletsdk.Native.Type.ByteArrayHolder;
+import com.htc.htcwalletsdk.Security.Key.PublicKeyHolder;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "MainActivity";
@@ -19,8 +24,9 @@ public class MainActivity extends AppCompatActivity {
     String mZKMA_version;
     String mStrApiVersion;
     long uid;
-    String wallet_name = "testZKMA";
-    String sha256 = "24681012579";
+    String m_androidID;
+    String wallet_name = "com.htc.MyWallet";
+    String sha256;
     Handler mHandler;
     HandlerThread mHandlerThread;
     @Override
@@ -48,14 +54,28 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
             try {
-                // 1-1. init
+                // 2-1. init
                 intValue = mZKMA.init(getApplicationContext());
-                // 1-2. getApiVersion
+                // 2-2. getApiVersion
                 mStrApiVersion = mZKMA.getApiVersion();
-                // 1-3. register
+                // 2-3. register
+                m_androidID = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                sha256 = Utils.StringToSha256String(m_androidID);
                 uid = mZKMA.register(wallet_name, sha256);
-                // 1-4. call ZKMA APIs, ex: create Seed
-                intValue = mZKMA.createSeed(uid);
+                // 2-4. If seed is not created for wallet ever, App should create or restore Seed once.
+                intValue = mZKMA.restoreSeed(uid);
+                if( mZKMA.isSeedExists(uid) == RESULT.SUCCESS ) {
+
+                    // TODO: call ZKMA APIs, ex: get account xPub Key
+                    // PublicKeyHolder accountxPubKey = mZKMA.getAccountExtPublicKey(uid, 44, 145, 0);
+                    // PublicKeyHolder bip32xPubKey = mZKMA.getBipExtPublicKey(uid, 44, 145, 0, 0,0);
+                    String strJson = Utils.GetSampleRawJsonString(sActivity, sActivity.getResources().getIdentifier("bch_jon_mainnet1","raw", sActivity.getPackageName()));
+                    ByteArrayHolder signTransactionByteArrayHolder= new ByteArrayHolder();
+                    intValue = mZKMA.signTransaction(uid, 145, 0, strJson, signTransactionByteArrayHolder);
+                } else {
+                    Toast.makeText(sActivity, "restore or create SEED first!", Toast.LENGTH_LONG).show();
+                }
+                Log.d(TAG, "test end!");
             } catch (Exception e) {
                 e.printStackTrace();
             }
